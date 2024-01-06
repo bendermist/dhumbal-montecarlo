@@ -25,8 +25,8 @@ class Value(Enum):
     EIGHT = 8
     NINE = 9
     TEN = 10
-    ELEVEN = 10
-    TWELVE = 10
+    ELEVEN = 11
+    TWELVE = 12
     JOKER = 0
 
 
@@ -49,10 +49,9 @@ class Deck:
                 if rank != Value.JOKER and suit != Suit.NONE:
                     card = Card(rank, suit)
                     deck.append(card)
-            else:
-                for _ in range(2):
-                    card = Card(Value.JOKER, Suit.NONE)
-                    deck.append(card)
+        for _ in range(2):
+            card = Card(Value.JOKER, Suit.NONE)
+            deck.append(card)
         return deck
     
     def shuffle_deck(self):

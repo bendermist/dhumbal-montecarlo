@@ -24,11 +24,12 @@ class Game:
                 self.game_over = True
             else:
                 self.prepare_next_round()
+        print("Game Over", self.scoreboard.get_scores())
 
     def deal_cards(self):
         for _ in range(5):
             for player in self.players:
-                player.draw_card(self.deck.cards)
+                player.draw_card(self.deck.cards, self)
         self.graveyard.append(self.deck.cards.pop())
     
     def check_refill_deck(self):
@@ -52,7 +53,6 @@ class Game:
                     # If player calls "Dhumbal", end the round
                     self.round_over = True
                     break
-                
                 self.check_refill_deck()
 
             self.turn += 1
@@ -69,7 +69,7 @@ class Game:
     def remove_eliminated_players(self):
         # Remove players with 108 points or more
         eliminated_players = self.scoreboard.get_eliminated_players()
-        self.players = [player for player in self.players if player.name not in eliminated_players]
+        self.players = [player for player in self.players if player not in eliminated_players]
 
     def check_game_end(self):
         # Game ends if 1 or fewer players remain with less than 108 points
@@ -89,7 +89,7 @@ class Game:
             player.called_dhumbal = False
         print("Starting Round", self.round)
         print("Current Scores:", self.scoreboard.get_scores())    
-        input("Press Enter to continue...")
+        # input("Press Enter to continue...")
         
 
     # Other methods like next_player, current_player, draw_card, etc. remain the same
