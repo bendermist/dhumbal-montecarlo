@@ -5,25 +5,28 @@ from cards import Deck
 from game import Game
 from player import Player, DiscardBiggestStrategy, MinimizeCardNumberStrategy
 
-
 class MonteCarlo:
-    def __init__(self, players, num_simulations):
+    def __init__(self, players, num_simulations, verbose=False):
         self.num_simulations = num_simulations
         self.players = players
-        self.game = Game(self.players) # Game object used to run simulations
+        self.verbose = verbose
+        self.game = Game(self.players, self.verbose) # Game object used to run simulations
+        
         
     def run_simulation(self):
         results = []
-        for _ in range(self.num_simulations):
-            self.game = Game(self.players)  # Reset the game
+        for i in range(self.num_simulations):
+            self.game = Game(self.players, self.verbose)  # Reset the game
             self.game.start_game()
             results.append(self.game.scoreboard.round_log)
+            print(f'Current iteration: {i} / {self.num_simulations}', end='\r')
         self.results = results
 
     def analyze_results(self):
-        player_wins = defaultdict(int)
+        player_positions = defaultdict(lambda: defaultdict(int))
         completed_games = [result for result in self.results if len(result) > 0]
-        print(len(self.results)-len(completed_games),"out of", len(self.results), "games ended in a draw")
+        print(len(self.results) - len(completed_games), "out of", len(self.results), "games ended in a draw")
+
         for simulation in completed_games:
             last_round = simulation[-1]
             # Sort players based on score_total, score_at_round, and Result.value
@@ -31,13 +34,16 @@ class MonteCarlo:
                 last_round.items(), 
                 key=lambda x: (x[1][1], x[1][0], x[1][2].value)
             )
-            winner = sorted_players[0][0]  # Player with the lowest combined score
-            player_wins[winner] += 1
+            # Count positions for each player
+            for position, (player, _) in enumerate(sorted_players, start=1):
+                player_positions[player][position] += 1
 
-        # Calculate win percentages
-        win_percentages = {player.name: wins / len(completed_games) * 100 for player, wins in player_wins.items()}
+        # Calculate position probabilities
+        position_probabilities = {player.name: {position: count / len(completed_games) * 100 * len(self.players) 
+                                                for position, count in positions.items()}
+                                for player, positions in player_positions.items()}
 
-        return win_percentages
+        return position_probabilities
 
     def visualize_data(self, data):
         
@@ -58,9 +64,11 @@ if __name__ == '__main__':
         Player('Player 1', DiscardBiggestStrategy(dhumbal_threshold=5, draw_graveyard_threshold=5), verbose=verbose), 
         Player('Player 2', DiscardBiggestStrategy(dhumbal_threshold=5, draw_graveyard_threshold=5), verbose=verbose), 
         Player('Player 3', MinimizeCardNumberStrategy(dhumbal_threshold=5, draw_graveyard_threshold=5, try_to_pool_threshold=2), verbose=verbose),
+        Player('Player 4', MinimizeCardNumberStrategy(dhumbal_threshold=5, draw_graveyard_threshold=5, try_to_pool_threshold=2), verbose=verbose),
+        Player('Player 5', MinimizeCardNumberStrategy(dhumbal_threshold=5, draw_graveyard_threshold=5, try_to_pool_threshold=2), verbose=verbose),
         ]
 
-    mc = MonteCarlo(players, 20)
+    mc = MonteCarlo(players, 200, verbose=verbose)
     mc.run_simulation()
     print([len(x) for x in mc.results])
     analysis = mc.analyze_results()

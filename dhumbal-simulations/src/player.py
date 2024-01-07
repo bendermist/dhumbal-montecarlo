@@ -55,10 +55,11 @@ class MinimizeCardNumberStrategy(PlayerStrategy):
         player.play_cards(self.get_cards_with_same_rank(player, highest_rank_card))
         
         # Decide whether to draw a card from the graveyard or the deck
-        if game.graveyard[-1].rank.value <= self.draw_graveyard_threshold:
+        threshold_to_draw_from_graveyard = self.draw_graveyard_threshold - max(4, game.turn // 4)
+        if game.graveyard[-1].rank.value <= threshold_to_draw_from_graveyard:
             # Draw from the graveyard if the top card's rank is above the threshold
             player.draw_card(game.graveyard, game)
-            print(player.name, f"drew card from graveyard, as less than {self.draw_graveyard_threshold}") if self.verbose else None
+            print(player.name, f"drew card from graveyard, as less than {threshold_to_draw_from_graveyard}") if self.verbose else None
         else:
             # Otherwise, draw from the deck
             player.draw_card(game.deck.cards, game)
@@ -84,9 +85,10 @@ class DiscardBiggestStrategy(PlayerStrategy):
         
         player.play_cards(self.get_cards_with_same_rank(player, highest_rank_card))
         
-        if game.graveyard[-1].rank.value <= self.draw_graveyard_threshold:
+        threshold_to_draw_from_graveyard = self.draw_graveyard_threshold - max(4, game.turn // 4)        
+        if game.graveyard[-1].rank.value <= threshold_to_draw_from_graveyard:
             player.draw_card(game.graveyard, game)
-            print(player.name, f"drew card from graveyard, as less than {self.draw_graveyard_threshold}") if self.verbose else None
+            print(player.name, f"drew card from graveyard, as less than {threshold_to_draw_from_graveyard}") if self.verbose else None
         else:
             player.draw_card(game.deck.cards, game)
             print(player.name, "drew card from deck, as grave bad") if self.verbose else None

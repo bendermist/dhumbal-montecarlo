@@ -35,7 +35,7 @@ class Scoreboard:
                     round_log[player] = (score, self.scores[player],Result.NORMAL)
         
         self.round_log.append(round_log)
-        print("Round Log", [(player.name, score) for player, score in round_log.items()])
+        print("Round Log", [(player.name, score) for player, score in round_log.items()]) if game.verbose else None
                 
 
 

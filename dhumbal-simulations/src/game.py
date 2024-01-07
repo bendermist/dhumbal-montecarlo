@@ -1,12 +1,15 @@
 from cards import Deck
 from scoreboard import Scoreboard
+import random
 
 class Game:
-    def __init__(self, players):
+    def __init__(self, players, verbose=False):
         self.players = players
+        random.shuffle(self.players)
+        self.verbose = verbose
         self.deck = Deck()
         self.graveyard = []
-        self.current_player = self.players[0]
+        self.current_player = random.choice(players)
         self.turn = 0
         self.round = 0
         self.round_over = False
@@ -24,7 +27,7 @@ class Game:
                 self.game_over = True
             else:
                 self.prepare_next_round()
-        print("Game Over", self.scoreboard.get_scores())
+        print("Game Over", self.scoreboard.get_scores()) if self.verbose else None
 
     def deal_cards(self):
         for _ in range(5):
@@ -36,7 +39,7 @@ class Game:
         if not self.deck.cards:
             self.deck.cards = self.graveyard[:-1]
             self.graveyard = self.graveyard[-1:]
-            print("Deck refilled")
+            print("Deck refilled") if self.verbose else None
 
     def play_round(self):
         # Determine the starting index of the current player
@@ -56,9 +59,9 @@ class Game:
                 self.check_refill_deck()
 
             self.turn += 1
-            print("Turn", self.turn)
+            print("Turn", self.turn) if self.verbose else None
             if self.turn > 100:
-                print("Turn limit (100) reached. Code breaking")
+                print("Turn limit (100) reached. Code breaking") if self.verbose else None
                 self.game_over = True
                 break
 
@@ -87,8 +90,8 @@ class Game:
         for player in self.players:
             player.hand.clear()
             player.called_dhumbal = False
-        print("Starting Round", self.round)
-        print("Current Scores:", self.scoreboard.get_scores())    
+        print("Starting Round", self.round) if self.verbose else None
+        print("Current Scores:", self.scoreboard.get_scores()) if self.verbose else None
         # input("Press Enter to continue...")
         
 
