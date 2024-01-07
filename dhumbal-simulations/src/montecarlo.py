@@ -1,7 +1,7 @@
-from collections import defaultdict
+from collections import Counter, OrderedDict
+import numpy as np
 import matplotlib.pyplot as plt
 
-from cards import Deck
 from game import Game
 from player import Player, DiscardBiggestStrategy, MinimizeCardNumberStrategy
 
@@ -11,6 +11,8 @@ class MonteCarlo:
         self.players = players
         self.verbose = verbose
         self.game = Game(self.players, self.verbose) # Game object used to run simulations
+        self.player_stats = {} # intermediate data structure to store data for each player
+        self.player_statistics = {} #summary of performance across all games
         
         
     def run_simulation(self):
@@ -23,27 +25,62 @@ class MonteCarlo:
         self.results = results
 
     def analyze_results(self):
-        player_positions = defaultdict(lambda: defaultdict(int))
-        completed_games = [result for result in self.results if len(result) > 0]
-        print(len(self.results) - len(completed_games), "out of", len(self.results), "games ended in a draw")
 
-        for simulation in completed_games:
-            last_round = simulation[-1]
-            # Sort players based on score_total, score_at_round, and Result.value
-            sorted_players = sorted(
-                last_round.items(), 
-                key=lambda x: (x[1][1], x[1][0], x[1][2].value)
-            )
-            # Count positions for each player
-            for position, (player, _) in enumerate(sorted_players, start=1):
-                player_positions[player][position] += 1
+        mc_results = self.results
+        for game_list in mc_results:
+            # Temporary structure to store data for position calculation
+            temp_positions = {}
+            for game in game_list:
+                for player, player_data in game.items():
+                    player_name = player.name  # Assuming each player key has a 'name' attribute
+                    if player_name not in self.player_stats:
+                        self.player_stats[player_name] = {'scores': [], 'outcomes': [], 'rounds_played': 0, 'final_points': [], 'last_round_points': []}
+                    self.player_stats[player_name]['scores'].append(player_data[0])
+                    self.player_stats[player_name]['outcomes'].append(player_data[2])
+                    # Update rounds played, final points, and last round points
+                    self.player_stats[player_name]['rounds_played'] += 1
+                    self.player_stats[player_name]['final_points'].append(player_data[1])
+                    self.player_stats[player_name]['last_round_points'].append(player_data[0])
+                    # Store in temp structure for position calculation
+                    temp_positions[player_name] = self.player_stats[player_name]
 
-        # Calculate position probabilities
-        position_probabilities = {player.name: {position: count / len(completed_games) * 100 * len(self.players) 
-                                                for position, count in positions.items()}
-                                for player, positions in player_positions.items()}
+            # Calculate positions
+            sorted_positions = sorted(temp_positions.items(), key=lambda x: (x[1]['rounds_played'], -x[1]['final_points'][-1], x[1]['last_round_points'][-1]), reverse=True)
+            for position, (player_name, _) in enumerate(sorted_positions, start=1):
+                if 'positions' not in self.player_stats[player_name]:
+                    self.player_stats[player_name]['positions'] = []
+                self.player_stats[player_name]['positions'].append(position)
+                
+                self.player_stats[player_name]['rounds_played'] = 0
+                self.player_stats[player_name]['final_points'].clear()
+                self.player_stats[player_name]['last_round_points'].clear()
 
-        return position_probabilities
+
+        # Compute statistics for each player
+        for player_name, data in self.player_stats.items():
+            mean_score = np.mean(data['scores'])
+            std_deviation = np.std(data['scores'])
+            variance = np.var(data['scores'])
+            outcome_frequency = Counter(data['outcomes'])
+            total_games = len(data['scores'])
+            outcome_percentages = {outcome: (count / total_games) * 100 for outcome, count in outcome_frequency.items()}
+            self.player_statistics[player_name] = {'mean_score': mean_score, 'std_deviation': std_deviation, 
+                                    'variance': variance, 'outcome_percentages': outcome_percentages}
+            
+    def player_position_probabilities(self):
+        position_probabilities = {}
+
+        # Calculate probabilities
+        for player_name, stats in self.player_stats.items():
+            total_games = len(stats['positions'])
+            position_counts = Counter(stats['positions'])
+            sorted_positions = OrderedDict(sorted(position_counts.items()))
+            position_probabilities[player_name] = {position: count / total_games for position, count in sorted_positions.items()}
+
+        # Sort by player names
+        sorted_position_probabilities = OrderedDict(sorted(position_probabilities.items()))
+        return sorted_position_probabilities
+
 
     def visualize_data(self, data):
         

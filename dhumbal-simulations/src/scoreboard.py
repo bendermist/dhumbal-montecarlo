@@ -22,16 +22,17 @@ class Scoreboard:
             score = player.calculate_score()
             if player == dhumbal_caller:
                 if dhumbal_caller_score < lowest_score:
-                    self.scores[player] += score
-                    round_log[player] = (score, self.scores[player], Result.DHUMBAL)
+                    self.scores[player] += 0
+                    round_log[player] = (0, self.scores[player], Result.DHUMBAL)
                 else:
                     self.scores[player] += 20
                     round_log[player] = (20, self.scores[player],Result.GOT_DESTROYED)
-            else:
-                self.scores[player] += score
+            else:                
                 if score <= dhumbal_caller_score:
-                    round_log[player] = (score, self.scores[player],Result.DESTROYED)
+                    self.scores[player] += 0
+                    round_log[player] = (0, self.scores[player],Result.DESTROYED)
                 else:
+                    self.scores[player] += score
                     round_log[player] = (score, self.scores[player],Result.NORMAL)
         
         self.round_log.append(round_log)
