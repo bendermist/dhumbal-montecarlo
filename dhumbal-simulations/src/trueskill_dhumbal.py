@@ -8,10 +8,11 @@ import numpy as np
 from trueskill import setup, Rating, rate, TrueSkill
 
 class TrueskillDhumbal:
-    def __init__(self, mc, players, mu=1000, sigma=300, beta=4000, tau=0.1, draw_probability=0):
+    def __init__(self, mc, players, mu=1200, sigma=300, beta=4000, tau=1, draw_probability=0, sigma_ratio = 0.75):
         
         # Initialize TrueSkill environment
-        setup(mu=mu, sigma=sigma, beta=beta, tau=tau, draw_probability=draw_probability)
+        TrueSkill(mu=mu, sigma=sigma, beta=beta, tau=tau, draw_probability=draw_probability).make_as_global()
+        self.sigma_ratio = 0.75
         
         # Initialize player stats
         self.mc = mc
@@ -64,7 +65,6 @@ class TrueskillDhumbal:
         self.reset_ratings()
         
         for i, game in enumerate(self.mc.results[start_index:start_index + number_of_games]):
-            setup(mu=1000, sigma=50, beta=4000, tau=0.001, draw_probability=0)
             for round in game:
                 # Create game results based on player scores in this round
                 game_results = [(player, round[player][0]) for player in round]
@@ -84,92 +84,106 @@ class TrueskillDhumbal:
                     
         return self.ranking_progression
     
-    def plot_ratings_windows(self):
-        # Initialize dictionary to store means for each player at each step
-        player_means = {}
+    def plot_ratings_windows(self, plot_score=False):
+        # Initialize dictionary to store data for each player at each step
+        player_data = {}
+        
+        score_sigma_ratio = self.sigma_ratio
 
         for sim in self.ranking_progression_windows:
             for player, values in sim.items():
-                if player not in player_means:
-                    player_means[player] = []
-                # Append only the means, ignoring the irrelevant number
-                player_means[player].append([mean for mean, _ in values])
+                if player not in player_data:
+                    player_data[player] = []
+                # Adjust data based on plot_score flag
+                player_data[player].append([mu - score_sigma_ratio * sigma if plot_score else mu for mu, sigma in values])
 
         # Find the minimum number of steps for each player
-        min_steps = {player: min(len(steps) for steps in player_means[player]) for player in player_means}
+        min_steps = {player: min(len(steps) for steps in player_data[player]) for player in player_data}
 
         # Truncate the data to the minimum number of steps for each player
-        for player in player_means:
-            player_means[player] = [steps[:min_steps[player]] for steps in player_means[player]]
+        for player in player_data:
+            player_data[player] = [steps[:min_steps[player]] for steps in player_data[player]]
 
         # Transpose the list of lists to get step-wise data
-        for player in player_means:
-            player_means[player] = list(map(list, zip(*player_means[player])))
+        for player in player_data:
+            player_data[player] = list(map(list, zip(*player_data[player])))
 
-        # Calculate mean of means and std of means for each step for each player
-        stats = {player: {'mean_of_means': [], 'std_of_means': []} for player in player_means}
+        # Calculate mean of primary values and std for each step for each player
+        stats = {player: {'mean_of_values': [], 'std_of_values': []} for player in player_data}
 
-        for player, steps in player_means.items():
-            for step_means in steps:
-                stats[player]['mean_of_means'].append(np.mean(step_means))
-                stats[player]['std_of_means'].append(np.std(step_means))
+        for player, steps in player_data.items():
+            for primary_values in steps:
+                stats[player]['mean_of_values'].append(np.mean(primary_values))
+                stats[player]['std_of_values'].append(np.std(primary_values))
 
         # Plotting
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        for player in player_means:
-            means = stats[player]['mean_of_means']
-            std_dev = stats[player]['std_of_means']
+        for player in player_data:
+            means = stats[player]['mean_of_values']
+            std_dev = stats[player]['std_of_values']
             steps = np.arange(len(means))
 
             # Plot mean
-            ax.plot(steps, means, label=f"{player} Mean of Means")
-
+            ax.plot(steps, means, label=f"{player} Mean")
             # Plot std deviation as a band
             ax.fill_between(steps, np.array(means) - np.array(std_dev), 
                             np.array(means) + np.array(std_dev), alpha=0.2)
 
-        ax.set_title("Evolution of Mean of Means with Standard Deviation")
+        title = "Evolution of Score with Standard Deviation" if plot_score else "Evolution of Mean of Mu with Standard Deviation"
+        ax.set_title(title)
         ax.set_xlabel("Step Number")
-        ax.set_ylabel("Mean of Means")
+        ax.set_ylabel("Score" if plot_score else "Mean of Mu")
         ax.legend()
 
         plt.tight_layout()
         plt.show()
     
-    def plot_ratings(self):
-
-        # Assuming ranking_progression is already filled with TrueSkill data
-        # ranking_progression = ...
+    def plot_ratings(self, plot_score=False):
+        
+        score_sigma_ratio = self.sigma_ratio
 
         # Preparing DataFrame for Seaborn
-        
         data_for_plot = []
         for name, ratings in self.ranking_progression.items():
             for iteration, (mu, sigma) in enumerate(ratings):
-                data_for_plot.append({'Player': name, 'Iteration': iteration, 'Mu': mu, 'Sigma': sigma})
+                score = mu - score_sigma_ratio * sigma if plot_score else None
+                data_for_plot.append({'Player': name, 'Iteration': iteration, 'Mu': mu, 'Sigma': sigma, 'Score': score})
                 
         df = pd.DataFrame(data_for_plot)
 
-        # Set up the plot with two subplots
+        # Set up the plots with two subplots
         fig, axes = plt.subplots(1, 2, figsize=(18, 6))
         sns.set(style="whitegrid")
 
-        # Line plot for the mean (mu) on the left subplot
-        sns.lineplot(ax=axes[0], x='Iteration', y='Mu', hue='Player', data=df, legend='full')
-        for name in self.ranking_progression.keys():
-            player_df = df[df['Player'] == name]
-            axes[0].fill_between(player_df['Iteration'], player_df['Mu'] - player_df['Sigma'], player_df['Mu'] + player_df['Sigma'], alpha=0.2)
-        axes[0].set_title('TrueSkill Rating Progression for Each Player')
-        axes[0].set_xlabel('Iteration')
-        axes[0].set_ylabel('TrueSkill Mu (with Sigma Confidence Interval)')
+        if plot_score:
+            # Line plot for the Score on the left subplot
+            sns.lineplot(ax=axes[0], x='Iteration', y='Score', hue='Player', data=df, legend='full')
+            axes[0].set_title('Score Progression for Each Player')
+            axes[0].set_xlabel('Iteration')
+            axes[0].set_ylabel('Score')
 
-        # Normal distribution plot for the mu values on the right subplot
-        for name in self.ranking_progression.keys():
-            player_df = df[df['Player'] == name]
-            sns.kdeplot(ax=axes[1], data=player_df['Mu'], label=name)
-        axes[1].set_title('Normal Distribution of Mu Values for Each Player')
-        axes[1].set_xlabel('Mu Value')
+            # Normal distribution plot for the Score values on the right subplot
+            for name in self.ranking_progression.keys():
+                player_df = df[df['Player'] == name]
+                sns.kdeplot(ax=axes[1], data=player_df['Score'], label=name)
+        else:
+            # Line plot for the mean (mu) with Sigma confidence interval on the left subplot
+            sns.lineplot(ax=axes[0], x='Iteration', y='Mu', hue='Player', data=df, legend='full')
+            for name in self.ranking_progression.keys():
+                player_df = df[df['Player'] == name]
+                axes[0].fill_between(player_df['Iteration'], player_df['Mu'] - player_df['Sigma'], player_df['Mu'] + player_df['Sigma'], alpha=0.2)
+            axes[0].set_title('TrueSkill Rating Progression for Each Player')
+            axes[0].set_xlabel('Iteration')
+            axes[0].set_ylabel('TrueSkill Mu (with Sigma Confidence Interval)')
+
+            # Normal distribution plot for the Mu values on the right subplot
+            for name in self.ranking_progression.keys():
+                player_df = df[df['Player'] == name]
+                sns.kdeplot(ax=axes[1], data=player_df['Mu'], label=name)
+
+        axes[1].set_title('Normal Distribution of Values for Each Player')
+        axes[1].set_xlabel('Value')
         axes[1].set_ylabel('Density')
         axes[1].legend(title='Player')
 
@@ -180,10 +194,17 @@ class TrueskillDhumbal:
     def get_player_rating(self, player_name):
         return self.player_stats[player_name]["trueskill_rating"]
     
+    def get_player_score(self, player_name):
+        rating = self.player_stats[player_name]["trueskill_rating"]
+        return rating.mu - self.sigma_ratio * rating.sigma
+    
     def get_all_player_ratings(self):
-        # Checking the updated rating
         for player in self.players:
-            print(player.name, self.player_stats[player.name]["trueskill_rating"])
+            print(player.name, self.get_player_rating(player.name))
+            
+    def get_all_player_score(self):
+        for player in self.players:
+            print(player.name, self.get_player_score(player.name))
             
             
     def win_probability(team1, team2, beta=4000):
